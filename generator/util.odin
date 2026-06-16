@@ -93,17 +93,20 @@ get_all_var_last_use :: proc(stmts: []Stmt) -> map[Variable]int {
 			op_use[stmt.out] = i
 			switch expr in stmt.expr {
 			case Add:
-				op_use[expr.left] = i
-				op_use[expr.right] = i
+				for t in expr.terms {
+					op_use[t] = i
+				}
 			case And:
-				op_use[expr.left] = i
-				op_use[expr.right] = i
+				for t in expr.terms {
+					op_use[t] = i
+				}
 			case Sub:
 				op_use[expr.left] = i
 				op_use[expr.right] = i
 			case Mul:
-				op_use[expr.left] = i
-				op_use[expr.right] = i
+				for t in expr.terms {
+					op_use[t] = i
+				}
 			case Eq:
 				op_use[expr.left] = i
 				op_use[expr.right] = i

@@ -98,13 +98,15 @@ nil_unused_expr :: proc(stmt: Expr, usage: ^map[Operand]bool) {
 }
 
 nil_unused_add :: proc(n: Add, usage: ^map[Operand]bool) {
-	usage[n.left] = true
-	usage[n.right] = true
+	for t in n.terms {
+		usage[t] = true
+	}
 }
 
 nil_unused_and :: proc(n: And, usage: ^map[Operand]bool) {
-	usage[n.left] = true
-	usage[n.right] = true
+	for t in n.terms {
+		usage[t] = true
+	}
 }
 
 nil_unused_sub :: proc(n: Sub, usage: ^map[Operand]bool) {
@@ -113,8 +115,9 @@ nil_unused_sub :: proc(n: Sub, usage: ^map[Operand]bool) {
 }
 
 nil_unused_mul :: proc(n: Mul, usage: ^map[Operand]bool) {
-	usage[n.left] = true
-	usage[n.right] = true
+	for t in n.terms {
+		usage[t] = true
+	}
 }
 
 nil_unused_eq :: proc(n: Eq, usage: ^map[Operand]bool) {

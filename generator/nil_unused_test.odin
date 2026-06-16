@@ -7,7 +7,7 @@ nil_unused_test_0000 :: proc(t: ^testing.T) {
 	stmts := make([dynamic]Stmt)
 
 	append(&stmts, Mov{dest = Variable{1}, src = Number{2}})
-	append(&stmts, Expr{out = Variable{2}, expr = Add{Number{1}, Number{1}}})
+	append(&stmts, Expr{out = Variable{2}, expr = Add{{Number{1}, Number{1}}}})
 	append(&stmts, Expr{out = Variable{3}, expr = Call{"foo", {Variable{2}}}})
 	append(&stmts, Label{"foo"})
 	append(&stmts, Label{"bar"})

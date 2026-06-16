@@ -25,6 +25,12 @@ mov_inline :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 		delete_key(&movs, k)
 	}
 
+	if len(movs) > 0 {
+		has_changed^ = true
+	} else {
+		return
+	}
+
 	for &stmt in stmts {
 		switch &stmt in stmt {
 		case Label:
@@ -35,17 +41,20 @@ mov_inline :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 		case Expr:
 			switch &expr in stmt.expr {
 			case Add:
-				expr.left = mov_inline_replace_operand(expr.left, &movs)
-				expr.right = mov_inline_replace_operand(expr.right, &movs)
+				for &t in expr.terms {
+					t = mov_inline_replace_operand(t, &movs)
+				}
 			case And:
-				expr.left = mov_inline_replace_operand(expr.left, &movs)
-				expr.right = mov_inline_replace_operand(expr.right, &movs)
+				for &t in expr.terms {
+					t = mov_inline_replace_operand(t, &movs)
+				}
 			case Sub:
 				expr.left = mov_inline_replace_operand(expr.left, &movs)
 				expr.right = mov_inline_replace_operand(expr.right, &movs)
 			case Mul:
-				expr.left = mov_inline_replace_operand(expr.left, &movs)
-				expr.right = mov_inline_replace_operand(expr.right, &movs)
+				for &t in expr.terms {
+					t = mov_inline_replace_operand(t, &movs)
+				}
 			case Eq:
 				expr.left = mov_inline_replace_operand(expr.left, &movs)
 				expr.right = mov_inline_replace_operand(expr.right, &movs)

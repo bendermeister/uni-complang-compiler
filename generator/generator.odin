@@ -100,6 +100,35 @@ loc_to_string :: proc(l: Location) -> string {
 // 	unreachable()
 // }
 
+to_register :: proc(o: Operand, var_map: ^map[Variable]Location) -> (string, bool) {
+	switch v in o {
+	case Variable:
+		l := var_map[v]
+		switch r in l {
+		case Address:
+			return "", false
+		case Register:
+			return reg_to_string(r), true
+		}
+	case Number:
+		return "", false
+	}
+	return "", false
+}
+
+load_to_register :: proc(
+	builder: ^strings.Builder,
+	default: Register,
+	o: Operand,
+	var_map: ^map[Variable]Location,
+) -> string {
+	if is_in_register(o, var_map) {
+		return reg_to_string(var_map[o.(Variable)].(Register))
+	}
+	fmt.sbprintf(builder, "\tmovq %v, %v\n", op_to_string(o, var_map), reg_to_string(default))
+	return reg_to_string(default)
+}
+
 op_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
 	switch o in o {
 	case Variable:
@@ -110,6 +139,43 @@ op_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
 		return strings.to_string(builder)
 	}
 	unreachable()
+}
+
+is_in_register :: proc(o: Operand, var_map: ^map[Variable]Location) -> bool {
+	switch o in o {
+	case Variable:
+		l := var_map[o]
+		switch _ in l {
+		case Address:
+			return false
+		case Register:
+			return true
+		}
+	case Number:
+		return false
+	}
+	return false
+}
+
+deref :: proc(
+	builder: ^strings.Builder,
+	base: Operand,
+	offset: Operand,
+	var_map: ^map[Variable]Location,
+) -> string {
+	nb := strings.builder_make()
+
+	switch o in offset {
+	case Variable:
+		base := load_to_register(builder, .RAX, base, var_map)
+		offset := load_to_register(builder, .RSI, o, var_map)
+		fmt.sbprintf(&nb, "(%v, %v, 8)", base, offset)
+	case Number:
+		base := load_to_register(builder, .RAX, base, var_map)
+		fmt.sbprintf(&nb, "%v(%v)", o.inner * 8, base)
+	}
+
+	return strings.to_string(nb)
 }
 
 function_generate :: proc(function: Function) -> string {
@@ -138,17 +204,20 @@ function_generate :: proc(function: Function) -> string {
 		case Expr:
 			switch expr in stmt.expr {
 			case Add:
-				op_hist[expr.left] += 1
-				op_hist[expr.right] += 1
+				for t in expr.terms {
+					op_hist[t] += 1
+				}
 			case And:
-				op_hist[expr.left] += 1
-				op_hist[expr.right] += 1
+				for t in expr.terms {
+					op_hist[t] += 1
+				}
 			case Sub:
 				op_hist[expr.left] += 1
 				op_hist[expr.right] += 1
 			case Mul:
-				op_hist[expr.left] += 1
-				op_hist[expr.right] += 1
+				for t in expr.terms {
+					op_hist[t] += 1
+				}
 			case Eq:
 				op_hist[expr.left] += 1
 				op_hist[expr.right] += 1
@@ -212,7 +281,6 @@ function_generate :: proc(function: Function) -> string {
 	offset: u64 = 0
 
 	assert(len(parameter) <= 6)
-
 
 	var_map := make(map[Variable]Location)
 	defer delete(var_map)
@@ -298,50 +366,61 @@ function_generate :: proc(function: Function) -> string {
 		case Label:
 			fmt.sbprintf(&builder, "\t%v:\n", stmt.inner)
 		case Write:
-			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.base, &var_map))
-			fmt.sbprintf(&builder, "\tmovq %v, %%rsi\n", op_to_string(stmt.offset, &var_map))
-			fmt.sbprintf(&builder, "\tmovq %v, %%rdi\n", op_to_string(stmt.value, &var_map))
-			fmt.sbprintf(&builder, "\tmovq %%rdi, (%%rax, %%rsi, 8)\n")
+			deref := deref(&builder, stmt.base, stmt.offset, &var_map)
+			switch v in stmt.value {
+			case Variable:
+				value := load_to_register(&builder, .RDI, stmt.value, &var_map)
+				fmt.sbprintf(&builder, "\tmovq %v, %v\n", value, deref)
+			case Number:
+				fmt.sbprintf(&builder, "\tmovq $%v, %v\n", v.inner, deref)
+			}
 		case Expr:
 			switch expr in stmt.expr {
 			case Add:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\taddq %v, %%rax\n", op_to_string(expr.right, &var_map))
+				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.terms[0], &var_map))
+				for t in expr.terms[1:] {
+					fmt.sbprintf(&builder, "\taddq %v, %%rax\n", op_to_string(t, &var_map))
+				}
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case And:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tandq %v, %%rax\n", op_to_string(expr.right, &var_map))
+				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.terms[0], &var_map))
+				for t in expr.terms[1:] {
+					fmt.sbprintf(&builder, "\tandq %v, %%rax\n", op_to_string(t, &var_map))
+				}
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Sub:
 				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
 				fmt.sbprintf(&builder, "\tsubq %v, %%rax\n", op_to_string(expr.right, &var_map))
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Mul:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\timul %v, %%rax\n", op_to_string(expr.right, &var_map))
+				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.terms[0], &var_map))
+				for t in expr.terms[1:] {
+					fmt.sbprintf(&builder, "\timul %v, %%rax\n", op_to_string(t, &var_map))
+				}
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Eq:
-				fmt.sbprintf(&builder, "\txorq %%rax, %%rax\n")
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tcmpq %v, %%rax\n", op_to_string(expr.right, &var_map))
+				left := load_to_register(&builder, .RAX, expr.left, &var_map)
+				fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(expr.right, &var_map), left)
 				fmt.sbprintf(&builder, "\tsete %%al\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Gt:
-				fmt.sbprintf(&builder, "\txorq %%rax, %%rax\n")
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tcmpq %v, %%rax\n", op_to_string(expr.right, &var_map))
-				fmt.sbprintf(&builder, "\tsetle %%al\n")
-				fmt.sbprintf(&builder, "\txorq $1, %%rax\n")
+				left := load_to_register(&builder, .RAX, expr.left, &var_map)
+				fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(expr.right, &var_map), left)
+				fmt.sbprintf(&builder, "\tsetg %%al\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Not:
 				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.operand, &var_map))
 				fmt.sbprintf(&builder, "\txorq $1, %%rax\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Read:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.base, &var_map))
-				fmt.sbprintf(&builder, "\tmovq %v, %%rsi\n", op_to_string(expr.offset, &var_map))
-				fmt.sbprintf(&builder, "\tmovq (%%rax, %%rsi, 8), %%rax\n")
-				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				deref := deref(&builder, expr.base, expr.offset, &var_map)
+				if is_in_register(stmt.out, &var_map) {
+					dest := reg_to_string(var_map[stmt.out].(Register))
+					fmt.sbprintf(&builder, "\tmovq %v, %v\n", deref, dest)
+				} else {
+					fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", deref)
+					fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				}
 			case Call:
 				for v, i in expr.arguments {
 					fmt.sbprintf(

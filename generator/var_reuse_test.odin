@@ -12,7 +12,7 @@ var_reuse_test_0000 :: proc(t: ^testing.T) {
 	append(&stmts, Par{Variable{0}})
 	append(&stmts, Par{Variable{1}})
 	append(&stmts, Mov{Variable{3}, Number{1}})
-	append(&stmts, Expr{Variable{4}, Add{Variable{0}, Number{1}}})
+	append(&stmts, Expr{Variable{4}, Add{{Variable{0}, Number{1}}}})
 
 	var_reuse(&stmts)
 
@@ -78,7 +78,7 @@ var_reuse_test_0002 :: proc(t: ^testing.T) {
 	stmts := make([dynamic]Stmt)
 	append(&stmts, Par{Variable{0}})
 	append(&stmts, Par{Variable{1}})
-	append(&stmts, Expr{Variable{2}, Add{Variable{1}, Number{0}}})
+	append(&stmts, Expr{Variable{2}, Add{{Variable{1}, Number{0}}}})
 
 	var_reuse(&stmts)
 

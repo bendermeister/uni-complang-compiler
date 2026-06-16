@@ -25,17 +25,20 @@ var_reuse :: proc(stmts: ^[dynamic]Stmt) {
 			stmt.out = var_reuse_replace_var(stmt.out, &replace)
 			switch &expr in stmt.expr {
 			case Add:
-				expr.left = var_reuse_replace_operand(expr.left, &replace)
-				expr.right = var_reuse_replace_operand(expr.right, &replace)
+				for &t in expr.terms {
+					t = var_reuse_replace_operand(t, &replace)
+				}
 			case And:
-				expr.left = var_reuse_replace_operand(expr.left, &replace)
-				expr.right = var_reuse_replace_operand(expr.right, &replace)
+				for &t in expr.terms {
+					t = var_reuse_replace_operand(t, &replace)
+				}
 			case Sub:
 				expr.left = var_reuse_replace_operand(expr.left, &replace)
 				expr.right = var_reuse_replace_operand(expr.right, &replace)
 			case Mul:
-				expr.left = var_reuse_replace_operand(expr.left, &replace)
-				expr.right = var_reuse_replace_operand(expr.right, &replace)
+				for &t in expr.terms {
+					t = var_reuse_replace_operand(t, &replace)
+				}
 			case Eq:
 				expr.left = var_reuse_replace_operand(expr.left, &replace)
 				expr.right = var_reuse_replace_operand(expr.right, &replace)

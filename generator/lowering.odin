@@ -257,26 +257,18 @@ sum_lower :: proc(
 	var_counter: ^u64,
 	var_mapping: ^map[string]Variable,
 ) -> Operand {
-	helper :: proc(
-		terms: []^parser.Term,
-		stmts: ^[dynamic]Stmt,
-		var_counter: ^u64,
-		var_mapping: ^map[string]Variable,
-	) -> Operand {
-		if len(terms) == 1 {
-			return term_lower(terms[0], stmts, var_counter, var_mapping)
-		}
 
-		left := term_lower(terms[0], stmts, var_counter, var_mapping)
-		right := helper(terms[1:], stmts, var_counter, var_mapping)
-		out := var_next(var_counter)
-		append(stmts, Expr{out = out, expr = Add{left = left, right = right}})
-		return out
+	terms := make([dynamic]Operand)
+
+	for t in node.terms {
+		tt := term_lower(t, stmts, var_counter, var_mapping)
+		append(&terms, tt)
 	}
 
-	assert(len(node.terms) != 0)
+	dest := var_next(var_counter)
 
-	return helper(node.terms, stmts, var_counter, var_mapping)
+	append(stmts, Expr{out = dest, expr = Add{terms[:]}})
+	return dest
 }
 
 
@@ -286,27 +278,17 @@ product_lower :: proc(
 	var_counter: ^u64,
 	var_mapping: ^map[string]Variable,
 ) -> Operand {
-	helper :: proc(
-		terms: []^parser.Term,
-		stmts: ^[dynamic]Stmt,
-		var_counter: ^u64,
-		var_mapping: ^map[string]Variable,
-	) -> Operand {
-		if len(terms) == 1 {
-			return term_lower(terms[0], stmts, var_counter, var_mapping)
-		}
+	terms := make([dynamic]Operand)
 
-		left := term_lower(terms[0], stmts, var_counter, var_mapping)
-		right := helper(terms[1:], stmts, var_counter, var_mapping)
-		out := var_next(var_counter)
-		append(stmts, Expr{out = out, expr = Mul{left = left, right = right}})
-		return out
+	for t in node.terms {
+		tt := term_lower(t, stmts, var_counter, var_mapping)
+		append(&terms, tt)
 	}
 
-	assert(len(node.terms) != 0)
+	dest := var_next(var_counter)
 
-	return helper(node.terms, stmts, var_counter, var_mapping)
-
+	append(stmts, Expr{out = dest, expr = Mul{terms[:]}})
+	return dest
 }
 
 conjunction_lower :: proc(
@@ -315,28 +297,17 @@ conjunction_lower :: proc(
 	var_counter: ^u64,
 	var_mapping: ^map[string]Variable,
 ) -> Operand {
-	assert(len(node.terms) != 0)
+	terms := make([dynamic]Operand)
 
-	terms := make([]Operand, len(node.terms))
-	defer delete(terms)
-
-	for _, i in node.terms {
-		terms[i] = term_lower(node.terms[i], stmts, var_counter, var_mapping)
+	for t in node.terms {
+		tt := term_lower(t, stmts, var_counter, var_mapping)
+		append(&terms, tt)
 	}
 
-	helper :: proc(terms: []Operand, stmts: ^[dynamic]Stmt, var_counter: ^u64) -> Operand {
-		if len(terms) == 1 {
-			return terms[0]
-		}
-		out := var_next(var_counter)
-		left := terms[0]
-		right := helper(terms[1:], stmts, var_counter)
-		append(stmts, Expr{out = out, expr = And{left = left, right = right}})
+	dest := var_next(var_counter)
 
-		return out
-	}
-
-	return helper(terms, stmts, var_counter)
+	append(stmts, Expr{out = dest, expr = Mul{terms[:]}})
+	return dest
 }
 
 greater_lower :: proc(
@@ -429,6 +400,7 @@ function_call_lower :: proc(
 		name      = node.name.literal,
 		arguments = arguments[:],
 	}
+
 	out := var_next(var_counter)
 
 	append(stmts, Expr{out = out, expr = call})

@@ -60,6 +60,14 @@ optimize :: proc(stmts: ^[dynamic]Stmt) {
 		foo(stmts[:])
 		fmt.eprintln()
 		fmt.eprintln()
+
+		var_rename(stmts, &has_changed)
+		nil_filter(stmts, &has_changed)
+
+		fmt.eprintln("var_rename: ")
+		foo(stmts[:])
+		fmt.eprintln()
+		fmt.eprintln()
 	}
 
 	var_reuse(stmts)

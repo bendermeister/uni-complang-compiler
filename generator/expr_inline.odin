@@ -43,22 +43,79 @@ expr_inline_expr :: proc(n: Expr, has_changed: ^bool) -> Stmt {
 }
 
 expr_inline_add :: proc(n: Add, dest: Variable, has_changed: ^bool) -> Stmt {
-	if operand_is_number(n.left) && operand_is_number(n.right) {
-		left := n.left.(Number)
-		right := n.right.(Number)
+
+	if len(n.terms) == 0 {
 		has_changed^ = true
-		return Mov{dest = dest, src = Number{left.inner + right.inner}}
+		return nil
 	}
+
+	if len(n.terms) == 1 {
+		has_changed^ = true
+		return Mov{dest = dest, src = n.terms[0]}
+	}
+
+	num_count := 0
+
+	for t in n.terms {
+		if operand_is_number(t) {
+			num_count += 1
+		}
+	}
+
+	if num_count > 1 {
+		has_changed^ = true
+		num: u64 = 0
+		terms := make([dynamic]Operand)
+
+		for t in n.terms {
+			switch t in t {
+			case Variable:
+				append(&terms, t)
+			case Number:
+				num += t.inner
+			}
+		}
+		append(&terms, Number{num})
+		return Expr{out = dest, expr = Add{terms[:]}}
+	}
+
 	return Expr{out = dest, expr = n}
 }
 
 expr_inline_and :: proc(n: And, dest: Variable, has_changed: ^bool) -> Stmt {
-	if operand_is_number(n.left) && operand_is_number(n.right) {
-		left := n.left.(Number)
-		right := n.right.(Number)
+	if len(n.terms) == 0 {
 		has_changed^ = true
-		return Mov{dest = dest, src = Number{left.inner & right.inner}}
+		return nil
 	}
+
+	if len(n.terms) == 1 {
+		has_changed^ = true
+		return Mov{dest = dest, src = n.terms[0]}
+	}
+
+	num_count := 0
+	for t in n.terms {
+		if operand_is_number(t) {
+			num_count += 1
+		}
+	}
+
+	if num_count > 1 {
+		num: u64 = ~u64(0)
+		terms := make([dynamic]Operand)
+		for t in n.terms {
+			switch t in t {
+			case Variable:
+				append(&terms, t)
+			case Number:
+				num = num & t.inner
+			}
+		}
+		has_changed^ = true
+		append(&terms, Number{num})
+		return Expr{out = dest, expr = And{terms[:]}}
+	}
+
 	return Expr{out = dest, expr = n}
 }
 
@@ -73,11 +130,36 @@ expr_inline_sub :: proc(n: Sub, dest: Variable, has_changed: ^bool) -> Stmt {
 }
 
 expr_inline_mul :: proc(n: Mul, dest: Variable, has_changed: ^bool) -> Stmt {
-	if operand_is_number(n.left) && operand_is_number(n.right) {
-		left := n.left.(Number)
-		right := n.right.(Number)
+	if len(n.terms) == 0 {
 		has_changed^ = true
-		return Mov{dest = dest, src = Number{left.inner * right.inner}}
+		return nil
+	}
+	if len(n.terms) == 1 {
+		has_changed^ = true
+		return Mov{dest = dest, src = n.terms[0]}
+	}
+
+	num_count := 0
+	for t in n.terms {
+		if operand_is_number(t) {
+			num_count += 1
+		}
+	}
+
+	if num_count > 1 {
+		num: u64 = 1
+		terms := make([dynamic]Operand)
+		for t in n.terms {
+			switch t in t {
+			case Variable:
+				append(&terms, t)
+			case Number:
+				num = num * t.inner
+			}
+		}
+		append(&terms, Number{num})
+		has_changed^ = true
+		return Expr{out = dest, expr = Mul{terms[:]}}
 	}
 	return Expr{out = dest, expr = n}
 }

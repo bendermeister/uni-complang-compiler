@@ -77,15 +77,19 @@ operand_to_string :: proc(n: Operand) -> string {
 }
 
 Add :: struct {
-	left:  Operand,
-	right: Operand,
+	terms: []Operand,
 }
 
 add_to_string :: proc(n: Add) -> string {
 	builder := strings.builder_make()
-	left := operand_to_string(n.left)
-	right := operand_to_string(n.right)
-	fmt.sbprintf(&builder, "(Add %v %v)", left, right)
+	strings.write_string(&builder, "(Add")
+
+	for t in n.terms {
+		strings.write_string(&builder, " ")
+		strings.write_string(&builder, operand_to_string(t))
+	}
+	strings.write_string(&builder, ")")
+
 	return strings.to_string(builder)
 }
 
@@ -100,9 +104,16 @@ not_to_string :: proc(n: Not) -> string {
 	return strings.to_string(builder)
 }
 
+stmt_is_mov :: proc(n: Stmt) -> bool {
+	#partial switch _ in n {
+	case Mov:
+		return true
+	}
+	return false
+}
+
 Mul :: struct {
-	left:  Operand,
-	right: Operand,
+	terms: []Operand,
 }
 
 Par :: struct {
@@ -117,22 +128,31 @@ par_to_string :: proc(n: Par) -> string {
 
 mul_to_string :: proc(n: Mul) -> string {
 	builder := strings.builder_make()
-	left := operand_to_string(n.left)
-	right := operand_to_string(n.right)
-	fmt.sbprintf(&builder, "(Mul %v %v)", left, right)
+	strings.write_string(&builder, "(Mul")
+
+	for t in n.terms {
+		strings.write_string(&builder, " ")
+		strings.write_string(&builder, operand_to_string(t))
+	}
+
+	strings.write_string(&builder, ")")
+
 	return strings.to_string(builder)
 }
 
 And :: struct {
-	left:  Operand,
-	right: Operand,
+	terms: []Operand,
 }
 
 and_to_string :: proc(n: And) -> string {
 	builder := strings.builder_make()
-	left := operand_to_string(n.left)
-	right := operand_to_string(n.right)
-	fmt.sbprintf(&builder, "(And %v %v)", left, right)
+	strings.write_string(&builder, "(And")
+
+	for t in n.terms {
+		strings.write_string(&builder, " ")
+		strings.write_string(&builder, operand_to_string(t))
+	}
+	strings.write_string(&builder, ")")
 	return strings.to_string(builder)
 }
 
