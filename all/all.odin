@@ -30,7 +30,15 @@ main :: proc() {
 
 	for f in ast.functions {
 		l := generator.function_lower(f)
+		fmt.eprintln("unoptimized: ")
+		for stmt in l.stmts {
+			fmt.eprintln(generator.stmt_to_string(stmt))
+		}
 		generator.optimize(&l.stmts)
+		fmt.eprintln("optimized: ")
+		for stmt in l.stmts {
+			fmt.eprintln(generator.stmt_to_string(stmt))
+		}
 		out := generator.function_generate(l)
 		fmt.println(out)
 	}

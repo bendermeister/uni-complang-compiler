@@ -57,6 +57,7 @@ unique_label_conds :: proc(
 ) {
 	new_label := label_generator_generate(generator)
 	mapping[node.label.literal] = new_label.literal
+	node.label = new_label
 
 	node.end_label = label_generator_generate(generator)
 	end_mapping[node.label.literal] = node.end_label.literal

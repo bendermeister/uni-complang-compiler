@@ -1,0 +1,21 @@
+fib2(array, n)
+    cond
+        n > 0 ->
+            array[0] := 1;
+            break;
+    end;
+    cond
+        n > 1 ->
+            array[1] := 1;
+            break;
+    end;
+
+    var i := 2;
+
+    cond
+        n > i ->
+            array[i] := (array[i - 1]) + (array[i - 2]);
+            i := i + 1;
+            continue;
+    end;
+end;

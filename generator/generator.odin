@@ -7,6 +7,7 @@ import "core:strings"
 // rdi, rsi, rdx, rcx, r8, r9, ...stack
 // return: rax
 
+
 Register :: enum {
 	RAX,
 	RBX,
@@ -24,6 +25,7 @@ Register :: enum {
 	R14,
 	R15,
 }
+
 
 reg_to_string :: proc(r: Register) -> string {
 	switch r {
@@ -86,17 +88,17 @@ loc_to_string :: proc(l: Location) -> string {
 	unreachable()
 }
 
-addrop_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
-	switch o in o {
-	case Variable:
-		return loc_to_string(var_map[o])
-	case Number:
-		builder := strings.builder_make()
-		fmt.sbprintf(&builder, "%v", o.inner)
-		return strings.to_string(builder)
-	}
-	unreachable()
-}
+// addrop_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
+// 	switch o in o {
+// 	case Variable:
+// 		return loc_to_string(var_map[o])
+// 	case Number:
+// 		builder := strings.builder_make()
+// 		fmt.sbprintf(&builder, "%v", o.inner)
+// 		return strings.to_string(builder)
+// 	}
+// 	unreachable()
+// }
 
 op_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
 	switch o in o {
@@ -286,12 +288,9 @@ function_generate :: proc(function: Function) -> string {
 	par_reg := []Register{.RDI, .RSI, .RDX, .RCX, .R8, .R9}
 
 	for p, i in parameter {
-		fmt.sbprintf(
-			&builder,
-			"\tmovq %v, %v\n",
-			reg_to_string(par_reg[i]),
-			loc_to_string(var_map[p]),
-		)
+		loc, ok := var_map[p]
+		if !ok {continue}
+		fmt.sbprintf(&builder, "\tmovq %v, %v\n", reg_to_string(par_reg[i]), loc_to_string(loc))
 	}
 
 	for stmt in function.stmts {
@@ -299,18 +298,10 @@ function_generate :: proc(function: Function) -> string {
 		case Label:
 			fmt.sbprintf(&builder, "\t%v:\n", stmt.inner)
 		case Write:
-			fmt.sbprintf(
-				&builder,
-				"\tmovq %v, %v\n",
-				addrop_to_string(stmt.base, &var_map),
-				reg_to_string(.RAX),
-			)
-			fmt.sbprintf(
-				&builder,
-				"\tmovq %v, %v(%%rax)\n",
-				op_to_string(stmt.value, &var_map),
-				addrop_to_string(stmt.offset, &var_map),
-			)
+			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.base, &var_map))
+			fmt.sbprintf(&builder, "\tmovq %v, %%rsi\n", op_to_string(stmt.offset, &var_map))
+			fmt.sbprintf(&builder, "\tmovq %v, %%rdi\n", op_to_string(stmt.value, &var_map))
+			fmt.sbprintf(&builder, "\tmovq %%rdi, (%%rax, %%rsi, 8)\n")
 		case Expr:
 			switch expr in stmt.expr {
 			case Add:
@@ -347,13 +338,10 @@ function_generate :: proc(function: Function) -> string {
 				fmt.sbprintf(&builder, "\txorq $1, %%rax\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Read:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", addrop_to_string(expr.base, &var_map))
-				fmt.sbprintf(
-					&builder,
-					"\tmovq %v(%%rax), %v\n",
-					addrop_to_string(expr.offset, &var_map),
-					loc_to_string(var_map[stmt.out]),
-				)
+				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.base, &var_map))
+				fmt.sbprintf(&builder, "\tmovq %v, %%rsi\n", op_to_string(expr.offset, &var_map))
+				fmt.sbprintf(&builder, "\tmovq (%%rax, %%rsi, 8), %%rax\n")
+				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Call:
 				for v, i in expr.arguments {
 					fmt.sbprintf(

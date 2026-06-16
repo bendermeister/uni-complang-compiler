@@ -207,6 +207,9 @@ lexer :: proc(buf: []u8) -> ([dynamic]Token, Error) {
 				token := Token{.LEFT_ARROW, "", 0, line}
 				append(&tokens, token)
 				buf = buf[2:]
+			} else if len(buf) > 2 && buf[1] == '-' {
+				buf = buf[2:]
+				for len(buf) > 0 && buf[0] != '\n' {buf = buf[1:]}
 			} else {
 				token := Token{.MINUS, "", 0, line}
 				append(&tokens, token)
