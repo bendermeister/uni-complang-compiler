@@ -1,0 +1,12 @@
+fib(n) 
+    cond
+        2 > n -> 
+            return 1;
+            break;
+        ->  
+            return fib(n-1) + fib(n-2);
+            break;
+    end;
+end
+;
+
