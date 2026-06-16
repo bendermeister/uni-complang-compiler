@@ -124,7 +124,7 @@ expr_inline_not :: proc(n: Not, out: Variable, has_changed: ^bool) -> Stmt {
 expr_inline_cjmp :: proc(n: CJmp, has_changed: ^bool) -> Stmt {
 	if operand_is_number(n.on) {
 		on := n.on.(Number)
-		if on.inner & 1 == 1 {
+		if on.inner & 1 == 0 {
 			return Jmp{n.label}
 		} else {
 			return nil

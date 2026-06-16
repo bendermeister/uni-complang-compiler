@@ -363,11 +363,10 @@ function_generate :: proc(function: Function) -> string {
 		case Jmp:
 			fmt.sbprintf(&builder, "\tjmp %v\n", stmt.label.inner)
 		case CJmp:
-			fmt.sbprintf(&builder, "\txorq %%rax, %%rax\n")
 			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.on, &var_map))
 			fmt.sbprintf(&builder, "\tandq $1, %%rax\n")
-			fmt.sbprintf(&builder, "\tcmpq $1, %%rax\n")
-			fmt.sbprintf(&builder, "\tje %v\n", stmt.label.inner)
+			fmt.sbprintf(&builder, "\ttestq %%rax, %%rax\n")
+			fmt.sbprintf(&builder, "\tjz %v\n", stmt.label.inner)
 		case Return:
 			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.operand, &var_map))
 			fmt.sbprintf(&builder, "\taddq $%v, %%rsp\n", offset * 8)

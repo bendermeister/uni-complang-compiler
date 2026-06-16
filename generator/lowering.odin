@@ -140,9 +140,7 @@ guarded_lower :: proc(
 	var_mapping: ^map[string]Variable,
 ) {
 	expr := expr_lower(node.expr, stmts, var_counter, var_mapping)
-	v := var_next(var_counter)
-	append(stmts, Expr{out = v, expr = Not{expr}})
-	append(stmts, CJmp{on = v, label = Label{node.end_label.literal}})
+	append(stmts, CJmp{on = expr, label = Label{node.end_label.literal}})
 
 	inner_var_mapping := map_copy(var_mapping)
 	defer delete(inner_var_mapping)
