@@ -68,6 +68,14 @@ optimize :: proc(stmts: ^[dynamic]Stmt) {
 		foo(stmts[:])
 		fmt.eprintln()
 		fmt.eprintln()
+
+		cjmp_inline(stmts, &has_changed)
+		nil_filter(stmts, &has_changed)
+
+		fmt.eprintln("cjmp_inline: ")
+		foo(stmts[:])
+		fmt.eprintln()
+		fmt.eprintln()
 	}
 
 	var_reuse(stmts)

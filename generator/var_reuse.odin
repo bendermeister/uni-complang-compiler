@@ -64,6 +64,28 @@ var_reuse :: proc(stmts: ^[dynamic]Stmt) {
 			stmt.dest = var_reuse_replace_var(stmt.dest, &replace)
 		case Par:
 			stmt.var = var_reuse_replace_var(stmt.var, &replace)
+		case Jz:
+			stmt.on = var_reuse_replace_operand(stmt.on, &replace)
+		case Jnz:
+			stmt.on = var_reuse_replace_operand(stmt.on, &replace)
+		case Je:
+			stmt.left = var_reuse_replace_operand(stmt.left, &replace)
+			stmt.right = var_reuse_replace_operand(stmt.right, &replace)
+		case Jne:
+			stmt.left = var_reuse_replace_operand(stmt.left, &replace)
+			stmt.right = var_reuse_replace_operand(stmt.right, &replace)
+		case Jg:
+			stmt.left = var_reuse_replace_operand(stmt.left, &replace)
+			stmt.right = var_reuse_replace_operand(stmt.right, &replace)
+		case Jge:
+			stmt.left = var_reuse_replace_operand(stmt.left, &replace)
+			stmt.right = var_reuse_replace_operand(stmt.right, &replace)
+		case Jl:
+			stmt.left = var_reuse_replace_operand(stmt.left, &replace)
+			stmt.right = var_reuse_replace_operand(stmt.right, &replace)
+		case Jle:
+			stmt.left = var_reuse_replace_operand(stmt.left, &replace)
+			stmt.right = var_reuse_replace_operand(stmt.right, &replace)
 		}
 	}
 }

@@ -26,6 +26,14 @@ get_all_vars :: proc(stmts: []Stmt) -> [dynamic]Variable {
 			append(&vars, stmt.dest)
 		case Par:
 			append(&vars, stmt.var)
+		case Jz:
+		case Jnz:
+		case Je:
+		case Jne:
+		case Jg:
+		case Jge:
+		case Jl:
+		case Jle:
 		}
 	}
 
@@ -40,14 +48,25 @@ get_all_var_def_index :: proc(stmts: []Stmt) -> map[Variable]int {
 		case Label:
 		case Write:
 		case Expr:
+			if stmt.out in var_def {continue}
 			var_def[stmt.out] = i
 		case Jmp:
 		case CJmp:
 		case Return:
 		case Mov:
+			if stmt.dest in var_def {continue}
 			var_def[stmt.dest] = i
 		case Par:
+			if stmt.var in var_def {continue}
 			var_def[stmt.var] = i
+		case Jz:
+		case Jnz:
+		case Je:
+		case Jne:
+		case Jg:
+		case Jge:
+		case Jl:
+		case Jle:
 		}
 	}
 
@@ -68,6 +87,14 @@ get_all_label_index :: proc(stmts: []Stmt) -> map[Label]int {
 		case Return:
 		case Mov:
 		case Par:
+		case Jz:
+		case Jnz:
+		case Je:
+		case Jne:
+		case Jg:
+		case Jge:
+		case Jl:
+		case Jle:
 
 		}
 	}
@@ -147,6 +174,28 @@ get_all_var_last_use :: proc(stmts: []Stmt) -> map[Variable]int {
 			op_use[stmt.src] = i
 		case Par:
 			op_use[stmt.var] = i
+		case Jz:
+			op_use[stmt.on] = i
+		case Jnz:
+			op_use[stmt.on] = i
+		case Je:
+			op_use[stmt.left] = i
+			op_use[stmt.right] = i
+		case Jne:
+			op_use[stmt.left] = i
+			op_use[stmt.right] = i
+		case Jg:
+			op_use[stmt.left] = i
+			op_use[stmt.right] = i
+		case Jge:
+			op_use[stmt.left] = i
+			op_use[stmt.right] = i
+		case Jl:
+			op_use[stmt.left] = i
+			op_use[stmt.right] = i
+		case Jle:
+			op_use[stmt.left] = i
+			op_use[stmt.right] = i
 		}
 	}
 

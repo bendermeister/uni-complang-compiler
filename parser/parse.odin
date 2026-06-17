@@ -1,5 +1,6 @@
 package parser
 
+import "core:os"
 parse :: proc(tokens: []Token) -> ^Program {
 	program, tokens := parse_program(tokens)
 	if program == nil {
@@ -8,6 +9,12 @@ parse :: proc(tokens: []Token) -> ^Program {
 	if len(tokens) != 0 {
 		return nil
 	}
+
+	ok := check_program(program)
+	if !ok {
+		os.exit(3)
+	}
+
 	unnil_program(program)
 
 	label_generator := label_generator_make()

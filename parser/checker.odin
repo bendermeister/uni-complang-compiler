@@ -36,7 +36,6 @@ check_function :: proc(
 ) -> (
 	ok: bool,
 ) {
-
 	ok = check_parameter(node.parameter, variables, labels)
 	if !ok {
 		return false
@@ -170,6 +169,7 @@ check_conds :: proc(
 ) -> (
 	ok: bool,
 ) {
+
 	variables_new := map_copy(variables)
 	defer delete(variables_new)
 

@@ -306,7 +306,7 @@ conjunction_lower :: proc(
 
 	dest := var_next(var_counter)
 
-	append(stmts, Expr{out = dest, expr = Mul{terms[:]}})
+	append(stmts, Expr{out = dest, expr = And{terms[:]}})
 	return dest
 }
 

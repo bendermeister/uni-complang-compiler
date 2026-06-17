@@ -10,7 +10,7 @@ label_generator_generate :: proc(generator: ^Label_Generator) -> ^Label {
 	builder := strings.builder_make()
 	for {
 		strings.builder_reset(&builder)
-		strings.write_string(&builder, "_internal_label_")
+		strings.write_string(&builder, ".L")
 		strings.write_u64(&builder, generator.num)
 		generator.num += 1
 

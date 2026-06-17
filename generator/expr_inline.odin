@@ -13,6 +13,84 @@ expr_inline :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 			stmt = expr_inline_cjmp(inner, has_changed)
 		case Return:
 		case Mov:
+		case Jz:
+			if operand_is_number(inner.on) {
+				on := inner.on.(Number)
+				if (on.inner & 1) == 0 {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Jnz:
+			if operand_is_number(inner.on) {
+				on := inner.on.(Number)
+				if (on.inner & 1) != 0 {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Je:
+			if operand_is_number(inner.left) && operand_is_number(inner.right) {
+				left := inner.left.(Number)
+				right := inner.right.(Number)
+				if left == right {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Jne:
+			if operand_is_number(inner.left) && operand_is_number(inner.right) {
+				left := inner.left.(Number)
+				right := inner.right.(Number)
+				if left != right {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Jg:
+			if operand_is_number(inner.left) && operand_is_number(inner.right) {
+				left := inner.left.(Number)
+				right := inner.right.(Number)
+				if left.inner > right.inner {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Jge:
+			if operand_is_number(inner.left) && operand_is_number(inner.right) {
+				left := inner.left.(Number)
+				right := inner.right.(Number)
+				if left.inner >= right.inner {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Jl:
+			if operand_is_number(inner.left) && operand_is_number(inner.right) {
+				left := inner.left.(Number)
+				right := inner.right.(Number)
+				if left.inner < right.inner {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
+		case Jle:
+			if operand_is_number(inner.left) && operand_is_number(inner.right) {
+				left := inner.left.(Number)
+				right := inner.right.(Number)
+				if left.inner <= right.inner {
+					stmt = Jmp{inner.label}
+				} else {
+					stmt = nil
+				}
+			}
 		}
 	}
 }

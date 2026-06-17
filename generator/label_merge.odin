@@ -6,7 +6,7 @@ label_merge :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 
 	for stmt, i in stmts {
 		if stmt == nil {continue}
-		switch stmt in stmt {
+		#partial switch stmt in stmt {
 		case Label:
 			for &nstmt in stmts[i + 1:] {
 				if !stmt_is_label(nstmt) {break}
@@ -15,13 +15,6 @@ label_merge :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 				label_map[label] = stmt
 				nstmt = nil
 			}
-		case Write:
-		case Expr:
-		case Jmp:
-		case CJmp:
-		case Return:
-		case Mov:
-		case Par:
 		}
 	}
 
@@ -37,6 +30,22 @@ label_merge :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 		case Return:
 		case Mov:
 		case Par:
+		case Jz:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Jnz:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Je:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Jne:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Jg:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Jge:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Jl:
+			stmt.label = label_map[stmt.label] or_else stmt.label
+		case Jle:
+			stmt.label = label_map[stmt.label] or_else stmt.label
 
 		}
 	}
