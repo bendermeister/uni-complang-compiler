@@ -77,15 +77,19 @@ operand_to_string :: proc(n: Operand) -> string {
 }
 
 Add :: struct {
-	left:  Operand,
-	right: Operand,
+	terms: []Operand,
 }
 
 add_to_string :: proc(n: Add) -> string {
 	builder := strings.builder_make()
-	left := operand_to_string(n.left)
-	right := operand_to_string(n.right)
-	fmt.sbprintf(&builder, "(Add %v %v)", left, right)
+	strings.write_string(&builder, "(Add")
+
+	for t in n.terms {
+		strings.write_string(&builder, " ")
+		strings.write_string(&builder, operand_to_string(t))
+	}
+	strings.write_string(&builder, ")")
+
 	return strings.to_string(builder)
 }
 
@@ -100,9 +104,16 @@ not_to_string :: proc(n: Not) -> string {
 	return strings.to_string(builder)
 }
 
+stmt_is_mov :: proc(n: Stmt) -> bool {
+	#partial switch _ in n {
+	case Mov:
+		return true
+	}
+	return false
+}
+
 Mul :: struct {
-	left:  Operand,
-	right: Operand,
+	terms: []Operand,
 }
 
 Par :: struct {
@@ -117,22 +128,31 @@ par_to_string :: proc(n: Par) -> string {
 
 mul_to_string :: proc(n: Mul) -> string {
 	builder := strings.builder_make()
-	left := operand_to_string(n.left)
-	right := operand_to_string(n.right)
-	fmt.sbprintf(&builder, "(Mul %v %v)", left, right)
+	strings.write_string(&builder, "(Mul")
+
+	for t in n.terms {
+		strings.write_string(&builder, " ")
+		strings.write_string(&builder, operand_to_string(t))
+	}
+
+	strings.write_string(&builder, ")")
+
 	return strings.to_string(builder)
 }
 
 And :: struct {
-	left:  Operand,
-	right: Operand,
+	terms: []Operand,
 }
 
 and_to_string :: proc(n: And) -> string {
 	builder := strings.builder_make()
-	left := operand_to_string(n.left)
-	right := operand_to_string(n.right)
-	fmt.sbprintf(&builder, "(And %v %v)", left, right)
+	strings.write_string(&builder, "(And")
+
+	for t in n.terms {
+		strings.write_string(&builder, " ")
+		strings.write_string(&builder, operand_to_string(t))
+	}
+	strings.write_string(&builder, ")")
 	return strings.to_string(builder)
 }
 
@@ -302,6 +322,136 @@ CJmp :: struct {
 	label: Label,
 }
 
+Je :: struct {
+	left:  Operand,
+	right: Operand,
+	label: Label,
+}
+
+je_to_string :: proc(n: Je) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(
+		&builder,
+		"(Je %v %v %v)",
+		operand_to_string(n.left),
+		operand_to_string(n.right),
+		label_to_string(n.label),
+	)
+	return strings.to_string(builder)
+}
+
+Jne :: struct {
+	left:  Operand,
+	right: Operand,
+	label: Label,
+}
+
+jne_to_string :: proc(n: Jne) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(
+		&builder,
+		"(Jne %v %v %v)",
+		operand_to_string(n.left),
+		operand_to_string(n.right),
+		label_to_string(n.label),
+	)
+	return strings.to_string(builder)
+}
+
+Jz :: struct {
+	on:    Operand,
+	label: Label,
+}
+
+jz_to_string :: proc(n: Jz) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(&builder, "(Jz %v %v)", operand_to_string(n.on), label_to_string(n.label))
+	return strings.to_string(builder)
+}
+
+Jnz :: struct {
+	on:    Operand,
+	label: Label,
+}
+
+jnz_to_string :: proc(n: Jnz) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(&builder, "(Jnz %v %v)", operand_to_string(n.on), label_to_string(n.label))
+	return strings.to_string(builder)
+}
+
+Jg :: struct {
+	left:  Operand,
+	right: Operand,
+	label: Label,
+}
+
+jg_to_string :: proc(n: Jg) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(
+		&builder,
+		"(Jg %v %v %v)",
+		operand_to_string(n.left),
+		operand_to_string(n.right),
+		label_to_string(n.label),
+	)
+	return strings.to_string(builder)
+}
+
+Jge :: struct {
+	left:  Operand,
+	right: Operand,
+	label: Label,
+}
+
+jge_to_string :: proc(n: Jge) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(
+		&builder,
+		"(Jge %v %v %v)",
+		operand_to_string(n.left),
+		operand_to_string(n.right),
+		label_to_string(n.label),
+	)
+	return strings.to_string(builder)
+}
+
+Jl :: struct {
+	left:  Operand,
+	right: Operand,
+	label: Label,
+}
+
+jl_to_string :: proc(n: Jl) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(
+		&builder,
+		"(Jl %v %v %v)",
+		operand_to_string(n.left),
+		operand_to_string(n.right),
+		label_to_string(n.label),
+	)
+	return strings.to_string(builder)
+}
+
+Jle :: struct {
+	left:  Operand,
+	right: Operand,
+	label: Label,
+}
+
+jle_to_string :: proc(n: Jle) -> string {
+	builder := strings.builder_make()
+	fmt.sbprintf(
+		&builder,
+		"(Jle %v %v %v)",
+		operand_to_string(n.left),
+		operand_to_string(n.right),
+		label_to_string(n.label),
+	)
+	return strings.to_string(builder)
+}
+
 cjmp_to_string :: proc(n: CJmp) -> string {
 	builder := strings.builder_make()
 	fmt.sbprintf(&builder, "(CJmp %v %v)", operand_to_string(n.on), label_to_string(n.label))
@@ -328,6 +478,14 @@ Stmt :: union {
 	Return,
 	Mov,
 	Par,
+	Jz,
+	Jnz,
+	Je,
+	Jne,
+	Jg,
+	Jge,
+	Jl,
+	Jle,
 }
 
 stmt_to_string :: proc(n: Stmt) -> string {
@@ -351,20 +509,29 @@ stmt_to_string :: proc(n: Stmt) -> string {
 		return return_to_string(n)
 	case Mov:
 		return mov_to_string(n)
+	case Jz:
+		return jz_to_string(n)
+	case Jnz:
+		return jnz_to_string(n)
+	case Je:
+		return je_to_string(n)
+	case Jne:
+		return jne_to_string(n)
+	case Jg:
+		return jg_to_string(n)
+	case Jge:
+		return jge_to_string(n)
+	case Jl:
+		return jl_to_string(n)
+	case Jle:
+		return jle_to_string(n)
 	}
 
 	unreachable()
 }
 
 stmt_is_par :: proc(stmt: Stmt) -> bool {
-	switch _ in stmt {
-	case Label:
-	case Write:
-	case Expr:
-	case Jmp:
-	case CJmp:
-	case Return:
-	case Mov:
+	#partial switch _ in stmt {
 	case Par:
 		return true
 	}
@@ -381,18 +548,44 @@ Program :: struct {
 }
 
 stmt_is_expr :: proc(stmt: Stmt) -> bool {
-	switch _ in stmt {
-	case Par:
+	#partial switch _ in stmt {
+	case Expr:
+		return true
+	}
+	return false
+}
+
+stmt_get_label_when_is_jmp :: proc(stmt: Stmt) -> (Label, bool) {
+	switch jmp in stmt {
 	case Label:
 	case Write:
 	case Expr:
-		return true
 	case Jmp:
+		return jmp.label, true
 	case CJmp:
+		return jmp.label, true
 	case Return:
 	case Mov:
+	case Par:
+	case Jz:
+		return jmp.label, true
+	case Jnz:
+		return jmp.label, true
+	case Je:
+		return jmp.label, true
+	case Jne:
+		return jmp.label, true
+	case Jg:
+		return jmp.label, true
+	case Jge:
+		return jmp.label, true
+	case Jl:
+		return jmp.label, true
+	case Jle:
+		return jmp.label, true
 	}
-	return false
+
+	return Label{""}, false
 }
 
 expr_is_add :: proc(expr: Expr) -> bool {
@@ -412,17 +605,9 @@ expr_is_add :: proc(expr: Expr) -> bool {
 }
 
 stmt_is_label :: proc(stmt: Stmt) -> bool {
-	switch _ in stmt {
+	#partial switch _ in stmt {
 	case Label:
 		return true
-	case Write:
-	case Expr:
-	case Jmp:
-	case CJmp:
-	case Return:
-	case Mov:
-	case Par:
-
 	}
 	return false
 }

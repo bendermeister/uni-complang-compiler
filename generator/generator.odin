@@ -88,17 +88,34 @@ loc_to_string :: proc(l: Location) -> string {
 	unreachable()
 }
 
-// addrop_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
-// 	switch o in o {
-// 	case Variable:
-// 		return loc_to_string(var_map[o])
-// 	case Number:
-// 		builder := strings.builder_make()
-// 		fmt.sbprintf(&builder, "%v", o.inner)
-// 		return strings.to_string(builder)
-// 	}
-// 	unreachable()
-// }
+to_register :: proc(o: Operand, var_map: ^map[Variable]Location) -> (string, bool) {
+	switch v in o {
+	case Variable:
+		l := var_map[v]
+		switch r in l {
+		case Address:
+			return "", false
+		case Register:
+			return reg_to_string(r), true
+		}
+	case Number:
+		return "", false
+	}
+	return "", false
+}
+
+load_to_register :: proc(
+	builder: ^strings.Builder,
+	default: Register,
+	o: Operand,
+	var_map: ^map[Variable]Location,
+) -> string {
+	if is_in_register(o, var_map) {
+		return reg_to_string(var_map[o.(Variable)].(Register))
+	}
+	fmt.sbprintf(builder, "\tmovq %v, %v\n", op_to_string(o, var_map), reg_to_string(default))
+	return reg_to_string(default)
+}
 
 op_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
 	switch o in o {
@@ -112,6 +129,43 @@ op_to_string :: proc(o: Operand, var_map: ^map[Variable]Location) -> string {
 	unreachable()
 }
 
+is_in_register :: proc(o: Operand, var_map: ^map[Variable]Location) -> bool {
+	switch o in o {
+	case Variable:
+		l := var_map[o]
+		switch _ in l {
+		case Address:
+			return false
+		case Register:
+			return true
+		}
+	case Number:
+		return false
+	}
+	return false
+}
+
+deref :: proc(
+	builder: ^strings.Builder,
+	base: Operand,
+	offset: Operand,
+	var_map: ^map[Variable]Location,
+) -> string {
+	nb := strings.builder_make()
+
+	switch o in offset {
+	case Variable:
+		base := load_to_register(builder, .RAX, base, var_map)
+		offset := load_to_register(builder, .RSI, o, var_map)
+		fmt.sbprintf(&nb, "(%v, %v, 8)", base, offset)
+	case Number:
+		base := load_to_register(builder, .RAX, base, var_map)
+		fmt.sbprintf(&nb, "%v(%v)", o.inner * 8, base)
+	}
+
+	return strings.to_string(nb)
+}
+
 function_generate :: proc(function: Function) -> string {
 	builder := strings.builder_make()
 
@@ -123,6 +177,8 @@ function_generate :: proc(function: Function) -> string {
 
 	op_hist := make(map[Operand]int)
 	defer delete(op_hist)
+
+	has_calls := false
 
 	for var in vars {
 		op_hist[var] = 0
@@ -138,17 +194,20 @@ function_generate :: proc(function: Function) -> string {
 		case Expr:
 			switch expr in stmt.expr {
 			case Add:
-				op_hist[expr.left] += 1
-				op_hist[expr.right] += 1
+				for t in expr.terms {
+					op_hist[t] += 1
+				}
 			case And:
-				op_hist[expr.left] += 1
-				op_hist[expr.right] += 1
+				for t in expr.terms {
+					op_hist[t] += 1
+				}
 			case Sub:
 				op_hist[expr.left] += 1
 				op_hist[expr.right] += 1
 			case Mul:
-				op_hist[expr.left] += 1
-				op_hist[expr.right] += 1
+				for t in expr.terms {
+					op_hist[t] += 1
+				}
 			case Eq:
 				op_hist[expr.left] += 1
 				op_hist[expr.right] += 1
@@ -161,6 +220,7 @@ function_generate :: proc(function: Function) -> string {
 				op_hist[expr.offset] += 1
 				op_hist[expr.base] += 1
 			case Call:
+				has_calls = true
 				for a in expr.arguments {
 					op_hist[a] += 1
 				}
@@ -173,6 +233,28 @@ function_generate :: proc(function: Function) -> string {
 		case Mov:
 			op_hist[stmt.src] += 1
 		case Par:
+		case Jz:
+			op_hist[stmt.on] += 1
+		case Jnz:
+			op_hist[stmt.on] += 1
+		case Je:
+			op_hist[stmt.left] += 1
+			op_hist[stmt.right] += 1
+		case Jne:
+			op_hist[stmt.left] += 1
+			op_hist[stmt.right] += 1
+		case Jg:
+			op_hist[stmt.left] += 1
+			op_hist[stmt.right] += 1
+		case Jge:
+			op_hist[stmt.left] += 1
+			op_hist[stmt.right] += 1
+		case Jl:
+			op_hist[stmt.left] += 1
+			op_hist[stmt.right] += 1
+		case Jle:
+			op_hist[stmt.left] += 1
+			op_hist[stmt.right] += 1
 		}
 	}
 
@@ -198,6 +280,8 @@ function_generate :: proc(function: Function) -> string {
 		return var, ok
 	}
 
+	ret_calls := 0
+
 	parameter := make([dynamic]Variable)
 	defer delete(parameter)
 
@@ -213,7 +297,6 @@ function_generate :: proc(function: Function) -> string {
 
 	assert(len(parameter) <= 6)
 
-
 	var_map := make(map[Variable]Location)
 	defer delete(var_map)
 
@@ -224,49 +307,99 @@ function_generate :: proc(function: Function) -> string {
 	var: Variable
 	ok: bool
 
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .RBX
-		append(&callee_saved, Register.RBX)
+	if has_calls {
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .RBX
+			append(&callee_saved, Register.RBX)
+		}
+
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R12
+			append(&callee_saved, Register.R12)
+		}
+
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R13
+			append(&callee_saved, Register.R13)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R14
+			append(&callee_saved, Register.R14)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R15
+			append(&callee_saved, Register.R15)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R10
+			append(&caller_saved, Register.R10)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R11
+			append(&caller_saved, Register.R11)
+		}
+	} else {
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R10
+			append(&caller_saved, Register.R10)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R11
+			append(&caller_saved, Register.R11)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .RBX
+			append(&callee_saved, Register.RBX)
+		}
+
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R12
+			append(&callee_saved, Register.R12)
+		}
+
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R13
+			append(&callee_saved, Register.R13)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R14
+			append(&callee_saved, Register.R14)
+		}
+
+		var, ok = pop_max(&var_hist)
+		if ok {
+			var_map[var] = .R15
+			append(&callee_saved, Register.R15)
+		}
+
+
 	}
 
-
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .R12
-		append(&callee_saved, Register.R12)
-	}
-
-
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .R13
-		append(&callee_saved, Register.R13)
-	}
-
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .R14
-		append(&callee_saved, Register.R14)
-	}
-
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .R15
-		append(&callee_saved, Register.R15)
-	}
-
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .R10
-		append(&caller_saved, Register.R10)
-	}
-
-	var, ok = pop_max(&var_hist)
-	if ok {
-		var_map[var] = .R11
-		append(&caller_saved, Register.R11)
-	}
 
 	var, ok = pop_max(&var_hist)
 
@@ -276,6 +409,10 @@ function_generate :: proc(function: Function) -> string {
 		var, ok = pop_max(&var_hist)
 	}
 
+	end_label_builder := strings.builder_make()
+	fmt.sbprintf(&end_label_builder, ".L_%v_end", function.name)
+	end_label := strings.to_string(end_label_builder)
+
 	fmt.sbprintf(&builder, ".global %v\n", function.name)
 	fmt.sbprintf(&builder, "%v:\n", function.name)
 
@@ -283,65 +420,143 @@ function_generate :: proc(function: Function) -> string {
 		fmt.sbprintf(&builder, "\tpush %v\n", reg_to_string(r))
 	}
 
-	fmt.sbprintf(&builder, "\tsubq $%v, %%rsp\n", offset * 8)
+	if offset > 0 {
+		fmt.sbprintf(&builder, "\tsubq $%v, %%rsp\n", offset * 8)
+	}
 
 	par_reg := []Register{.RDI, .RSI, .RDX, .RCX, .R8, .R9}
 
 	for p, i in parameter {
 		loc, ok := var_map[p]
 		if !ok {continue}
-		fmt.sbprintf(&builder, "\tmovq %v, %v\n", reg_to_string(par_reg[i]), loc_to_string(loc))
+		found := false
+		for pp in parameter[i + 1:] {
+			if pp == p {found = true}
+		}
+		if !found {
+			fmt.sbprintf(
+				&builder,
+				"\tmovq %v, %v\n",
+				reg_to_string(par_reg[i]),
+				loc_to_string(loc),
+			)
+		}
 	}
 
-	for stmt in function.stmts {
+	for stmt, stmt_index in function.stmts {
 		switch stmt in stmt {
 		case Label:
 			fmt.sbprintf(&builder, "\t%v:\n", stmt.inner)
 		case Write:
-			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.base, &var_map))
-			fmt.sbprintf(&builder, "\tmovq %v, %%rsi\n", op_to_string(stmt.offset, &var_map))
-			fmt.sbprintf(&builder, "\tmovq %v, %%rdi\n", op_to_string(stmt.value, &var_map))
-			fmt.sbprintf(&builder, "\tmovq %%rdi, (%%rax, %%rsi, 8)\n")
+			deref := deref(&builder, stmt.base, stmt.offset, &var_map)
+			switch v in stmt.value {
+			case Variable:
+				value := load_to_register(&builder, .RDI, stmt.value, &var_map)
+				fmt.sbprintf(&builder, "\tmovq %v, %v\n", value, deref)
+			case Number:
+				fmt.sbprintf(&builder, "\tmovq $%v, %v\n", v.inner, deref)
+			}
 		case Expr:
 			switch expr in stmt.expr {
 			case Add:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\taddq %v, %%rax\n", op_to_string(expr.right, &var_map))
-				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				count := 0
+				for t in expr.terms {
+					if !operand_is_variable(t) {continue}
+					if t.(Variable) != stmt.out {continue}
+					count += 1
+				}
+				if count == 1 && is_in_register(stmt.out, &var_map) {
+					dest := load_to_register(&builder, .RAX, stmt.out, &var_map)
+					for t in expr.terms {
+						if operand_is_variable(t) && t.(Variable) == stmt.out {continue}
+						fmt.sbprintf(&builder, "\taddq %v, %v\n", op_to_string(t, &var_map), dest)
+					}
+				} else {
+					fmt.sbprintf(
+						&builder,
+						"\tmovq %v, %%rax\n",
+						op_to_string(expr.terms[0], &var_map),
+					)
+					for t in expr.terms[1:] {
+						fmt.sbprintf(&builder, "\taddq %v, %%rax\n", op_to_string(t, &var_map))
+					}
+					fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				}
 			case And:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tandq %v, %%rax\n", op_to_string(expr.right, &var_map))
+				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.terms[0], &var_map))
+				for t in expr.terms[1:] {
+					fmt.sbprintf(&builder, "\tandq %v, %%rax\n", op_to_string(t, &var_map))
+				}
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Sub:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tsubq %v, %%rax\n", op_to_string(expr.right, &var_map))
-				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				if operand_is_variable(expr.left) &&
+				   expr.left.(Variable) == stmt.out &&
+				   is_in_register(stmt.out, &var_map) {
+					left := load_to_register(&builder, .RAX, stmt.out, &var_map)
+					fmt.sbprintf(
+						&builder,
+						"\tsubq %v, %v\n",
+						op_to_string(expr.right, &var_map),
+						left,
+					)
+				} else {
+					fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
+					fmt.sbprintf(
+						&builder,
+						"\tsubq %v, %%rax\n",
+						op_to_string(expr.right, &var_map),
+					)
+					fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				}
 			case Mul:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\timul %v, %%rax\n", op_to_string(expr.right, &var_map))
-				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				count := 0
+				for t in expr.terms {
+					if !operand_is_variable(t) {continue}
+					if t.(Variable) != stmt.out {continue}
+					count += 1
+				}
+				if count == 1 && is_in_register(stmt.out, &var_map) {
+					dest := load_to_register(&builder, .RAX, stmt.out, &var_map)
+					for t in expr.terms {
+						if operand_is_variable(t) && t.(Variable) == stmt.out {continue}
+						fmt.sbprintf(&builder, "\timul %v, %v\n", op_to_string(t, &var_map), dest)
+					}
+				} else {
+					fmt.sbprintf(
+						&builder,
+						"\tmovq %v, %%rax\n",
+						op_to_string(expr.terms[0], &var_map),
+					)
+					for t in expr.terms[1:] {
+						fmt.sbprintf(&builder, "\timul %v, %%rax\n", op_to_string(t, &var_map))
+					}
+					fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				}
 			case Eq:
+				left := load_to_register(&builder, .RSI, expr.left, &var_map)
 				fmt.sbprintf(&builder, "\txorq %%rax, %%rax\n")
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tcmpq %v, %%rax\n", op_to_string(expr.right, &var_map))
+				fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(expr.right, &var_map), left)
 				fmt.sbprintf(&builder, "\tsete %%al\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Gt:
+				left := load_to_register(&builder, .RSI, expr.left, &var_map)
 				fmt.sbprintf(&builder, "\txorq %%rax, %%rax\n")
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.left, &var_map))
-				fmt.sbprintf(&builder, "\tcmpq %v, %%rax\n", op_to_string(expr.right, &var_map))
-				fmt.sbprintf(&builder, "\tsetle %%al\n")
-				fmt.sbprintf(&builder, "\txorq $1, %%rax\n")
+				fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(expr.right, &var_map), left)
+				fmt.sbprintf(&builder, "\tsetg %%al\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Not:
 				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.operand, &var_map))
-				fmt.sbprintf(&builder, "\txorq $1, %%rax\n")
+				fmt.sbprintf(&builder, "\tnotq %%rax\n")
 				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
 			case Read:
-				fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(expr.base, &var_map))
-				fmt.sbprintf(&builder, "\tmovq %v, %%rsi\n", op_to_string(expr.offset, &var_map))
-				fmt.sbprintf(&builder, "\tmovq (%%rax, %%rsi, 8), %%rax\n")
-				fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				deref := deref(&builder, expr.base, expr.offset, &var_map)
+				if is_in_register(stmt.out, &var_map) {
+					dest := reg_to_string(var_map[stmt.out].(Register))
+					fmt.sbprintf(&builder, "\tmovq %v, %v\n", deref, dest)
+				} else {
+					fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", deref)
+					fmt.sbprintf(&builder, "\tmovq %%rax, %v\n", loc_to_string(var_map[stmt.out]))
+				}
 			case Call:
 				for v, i in expr.arguments {
 					fmt.sbprintf(
@@ -363,18 +578,17 @@ function_generate :: proc(function: Function) -> string {
 		case Jmp:
 			fmt.sbprintf(&builder, "\tjmp %v\n", stmt.label.inner)
 		case CJmp:
-			fmt.sbprintf(&builder, "\txorq %%rax, %%rax\n")
 			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.on, &var_map))
 			fmt.sbprintf(&builder, "\tandq $1, %%rax\n")
-			fmt.sbprintf(&builder, "\tcmpq $1, %%rax\n")
-			fmt.sbprintf(&builder, "\tje %v\n", stmt.label.inner)
+			fmt.sbprintf(&builder, "\ttestq %%rax, %%rax\n")
+			fmt.sbprintf(&builder, "\tjz %v\n", stmt.label.inner)
 		case Return:
 			fmt.sbprintf(&builder, "\tmovq %v, %%rax\n", op_to_string(stmt.operand, &var_map))
-			fmt.sbprintf(&builder, "\taddq $%v, %%rsp\n", offset * 8)
-			#reverse for r in callee_saved {
-				fmt.sbprintf(&builder, "\tpopq %v\n", reg_to_string(r))
+
+			if stmt_index != len(function.stmts) - 1 {
+				ret_calls += 1
+				fmt.sbprintf(&builder, "\tjmp %v\n", end_label)
 			}
-			fmt.sbprintf(&builder, "\tret\n")
 		case Mov:
 			fmt.sbprintf(
 				&builder,
@@ -383,8 +597,52 @@ function_generate :: proc(function: Function) -> string {
 				loc_to_string(var_map[stmt.dest]),
 			)
 		case Par:
+		case Jz:
+			on := load_to_register(&builder, .RAX, stmt.on, &var_map)
+			fmt.sbprintf(&builder, "\ttestq %v, %v\n", on, on)
+			fmt.sbprintf(&builder, "\tjz %v\n", stmt.label.inner)
+		case Jnz:
+			on := load_to_register(&builder, .RAX, stmt.on, &var_map)
+			fmt.sbprintf(&builder, "\ttestq %v, %v\n", on, on)
+			fmt.sbprintf(&builder, "\tjnz %v\n", stmt.label.inner)
+		case Je:
+			left := load_to_register(&builder, .RAX, stmt.left, &var_map)
+			fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(stmt.right, &var_map), left)
+			fmt.sbprintf(&builder, "\tje %v\n", stmt.label.inner)
+		case Jne:
+			left := load_to_register(&builder, .RAX, stmt.left, &var_map)
+			fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(stmt.right, &var_map), left)
+			fmt.sbprintf(&builder, "\tjne %v\n", stmt.label.inner)
+		case Jg:
+			left := load_to_register(&builder, .RAX, stmt.left, &var_map)
+			fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(stmt.right, &var_map), left)
+			fmt.sbprintf(&builder, "\tjg %v\n", stmt.label.inner)
+		case Jge:
+			left := load_to_register(&builder, .RAX, stmt.left, &var_map)
+			fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(stmt.right, &var_map), left)
+			fmt.sbprintf(&builder, "\tjge %v\n", stmt.label.inner)
+		case Jl:
+			left := load_to_register(&builder, .RAX, stmt.left, &var_map)
+			fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(stmt.right, &var_map), left)
+			fmt.sbprintf(&builder, "\tjl %v\n", stmt.label.inner)
+		case Jle:
+			left := load_to_register(&builder, .RAX, stmt.left, &var_map)
+			fmt.sbprintf(&builder, "\tcmpq %v, %v\n", op_to_string(stmt.right, &var_map), left)
+			fmt.sbprintf(&builder, "\tjle %v\n", stmt.label.inner)
 		}
 	}
+
+	if ret_calls > 0 {
+		fmt.sbprintf(&builder, "\t%v:\n", end_label)
+	}
+
+	if offset > 0 {
+		fmt.sbprintf(&builder, "\taddq $%v, %%rsp\n", offset * 8)
+	}
+	#reverse for r in callee_saved {
+		fmt.sbprintf(&builder, "\tpopq %v\n", reg_to_string(r))
+	}
+	fmt.sbprintf(&builder, "\tret\n")
 
 	return strings.to_string(builder)
 }

@@ -9,7 +9,6 @@ optimize :: proc(stmts: ^[dynamic]Stmt) {
 		}
 	}
 
-
 	// nil_filter is sadly needed after each optimization because the
 	// optimizations can't deal with nil values
 	for has_changed {
@@ -42,6 +41,38 @@ optimize :: proc(stmts: ^[dynamic]Stmt) {
 		nil_filter(stmts, &has_changed)
 
 		fmt.eprintln("nil_return: ")
+		foo(stmts[:])
+		fmt.eprintln()
+		fmt.eprintln()
+
+		label_merge(stmts, &has_changed)
+		nil_filter(stmts, &has_changed)
+
+		fmt.eprintln("label_merge: ")
+		foo(stmts[:])
+		fmt.eprintln()
+		fmt.eprintln()
+
+		nil_small_jump(stmts, &has_changed)
+		nil_filter(stmts, &has_changed)
+
+		fmt.eprintln("nil_small_jump: ")
+		foo(stmts[:])
+		fmt.eprintln()
+		fmt.eprintln()
+
+		var_rename(stmts, &has_changed)
+		nil_filter(stmts, &has_changed)
+
+		fmt.eprintln("var_rename: ")
+		foo(stmts[:])
+		fmt.eprintln()
+		fmt.eprintln()
+
+		cjmp_inline(stmts, &has_changed)
+		nil_filter(stmts, &has_changed)
+
+		fmt.eprintln("cjmp_inline: ")
 		foo(stmts[:])
 		fmt.eprintln()
 		fmt.eprintln()

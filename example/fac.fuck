@@ -1,0 +1,10 @@
+fac(n)
+    cond
+        n > 1 ->
+            return (n * (fac(n-1)));
+            break;
+        ->
+            return 1;
+            break;
+    end;
+end;

@@ -1,0 +1,10 @@
+fac1(n) 
+    var r:=1; 
+    cond 
+        n > 0 -> 
+            r := r * n;
+            n := n - 1;
+            continue;
+    end;
+    return r;
+end;

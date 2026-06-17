@@ -21,6 +21,36 @@ nil_unused :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 			nil_unused_return(inner, &var_usage)
 		case Mov:
 			nil_unused_mov(inner, &var_usage)
+		case Jz:
+			var_usage[inner.on] = true
+			label_usage[inner.label] = true
+		case Jnz:
+			var_usage[inner.on] = true
+			label_usage[inner.label] = true
+		case Je:
+			var_usage[inner.left] = true
+			var_usage[inner.right] = true
+			label_usage[inner.label] = true
+		case Jne:
+			var_usage[inner.left] = true
+			var_usage[inner.right] = true
+			label_usage[inner.label] = true
+		case Jg:
+			var_usage[inner.left] = true
+			var_usage[inner.right] = true
+			label_usage[inner.label] = true
+		case Jge:
+			var_usage[inner.left] = true
+			var_usage[inner.right] = true
+			label_usage[inner.label] = true
+		case Jl:
+			var_usage[inner.left] = true
+			var_usage[inner.right] = true
+			label_usage[inner.label] = true
+		case Jle:
+			var_usage[inner.left] = true
+			var_usage[inner.right] = true
+			label_usage[inner.label] = true
 		}
 	}
 
@@ -46,6 +76,14 @@ nil_unused :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 				stmt = nil
 				has_changed^ = true
 			}
+		case Jz:
+		case Jnz:
+		case Je:
+		case Jne:
+		case Jg:
+		case Jge:
+		case Jl:
+		case Jle:
 		}
 	}
 }
@@ -98,13 +136,15 @@ nil_unused_expr :: proc(stmt: Expr, usage: ^map[Operand]bool) {
 }
 
 nil_unused_add :: proc(n: Add, usage: ^map[Operand]bool) {
-	usage[n.left] = true
-	usage[n.right] = true
+	for t in n.terms {
+		usage[t] = true
+	}
 }
 
 nil_unused_and :: proc(n: And, usage: ^map[Operand]bool) {
-	usage[n.left] = true
-	usage[n.right] = true
+	for t in n.terms {
+		usage[t] = true
+	}
 }
 
 nil_unused_sub :: proc(n: Sub, usage: ^map[Operand]bool) {
@@ -113,8 +153,9 @@ nil_unused_sub :: proc(n: Sub, usage: ^map[Operand]bool) {
 }
 
 nil_unused_mul :: proc(n: Mul, usage: ^map[Operand]bool) {
-	usage[n.left] = true
-	usage[n.right] = true
+	for t in n.terms {
+		usage[t] = true
+	}
 }
 
 nil_unused_eq :: proc(n: Eq, usage: ^map[Operand]bool) {

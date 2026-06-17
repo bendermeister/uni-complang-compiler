@@ -13,10 +13,10 @@ mov_inline_test_0000 :: proc(t: ^testing.T) {
 
 	append(&stmts, Mov{dest = var, src = num})
 	append(&stmts, Write{base = var, offset = var, value = var})
-	append(&stmts, Expr{out = Variable{1}, expr = Add{var, var}})
-	append(&stmts, Expr{out = Variable{1}, expr = And{var, var}})
+	append(&stmts, Expr{out = Variable{1}, expr = Add{{var, var}}})
+	append(&stmts, Expr{out = Variable{1}, expr = And{{var, var}}})
 	append(&stmts, Expr{out = Variable{1}, expr = Sub{var, var}})
-	append(&stmts, Expr{out = Variable{1}, expr = Mul{var, var}})
+	append(&stmts, Expr{out = Variable{1}, expr = Mul{{var, var}}})
 	append(&stmts, Expr{out = Variable{1}, expr = Eq{var, var}})
 	append(&stmts, Expr{out = Variable{1}, expr = Gt{var, var}})
 	append(&stmts, Expr{out = Variable{1}, expr = Not{var}})

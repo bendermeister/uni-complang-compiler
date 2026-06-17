@@ -17,12 +17,27 @@ mov_inline :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 			writes[stmt.dest] += 1
 			movs[stmt.dest] = stmt.src
 		case Par:
+			writes[stmt.var] += 1
+		case Jz:
+		case Jnz:
+		case Je:
+		case Jne:
+		case Jg:
+		case Jge:
+		case Jl:
+		case Jle:
 		}
 	}
 
 	for k, v in writes {
-		if v == 1 {continue}
+		if v <= 1 {continue}
 		delete_key(&movs, k)
+	}
+
+	if len(movs) > 0 {
+		has_changed^ = true
+	} else {
+		return
 	}
 
 	for &stmt in stmts {
@@ -35,17 +50,20 @@ mov_inline :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 		case Expr:
 			switch &expr in stmt.expr {
 			case Add:
-				expr.left = mov_inline_replace_operand(expr.left, &movs)
-				expr.right = mov_inline_replace_operand(expr.right, &movs)
+				for &t in expr.terms {
+					t = mov_inline_replace_operand(t, &movs)
+				}
 			case And:
-				expr.left = mov_inline_replace_operand(expr.left, &movs)
-				expr.right = mov_inline_replace_operand(expr.right, &movs)
+				for &t in expr.terms {
+					t = mov_inline_replace_operand(t, &movs)
+				}
 			case Sub:
 				expr.left = mov_inline_replace_operand(expr.left, &movs)
 				expr.right = mov_inline_replace_operand(expr.right, &movs)
 			case Mul:
-				expr.left = mov_inline_replace_operand(expr.left, &movs)
-				expr.right = mov_inline_replace_operand(expr.right, &movs)
+				for &t in expr.terms {
+					t = mov_inline_replace_operand(t, &movs)
+				}
 			case Eq:
 				expr.left = mov_inline_replace_operand(expr.left, &movs)
 				expr.right = mov_inline_replace_operand(expr.right, &movs)
@@ -70,6 +88,28 @@ mov_inline :: proc(stmts: ^[dynamic]Stmt, has_changed: ^bool) {
 		case Mov:
 			stmt.src = mov_inline_replace_operand(stmt.src, &movs)
 		case Par:
+		case Jz:
+			stmt.on = mov_inline_replace_operand(stmt.on, &movs)
+		case Jnz:
+			stmt.on = mov_inline_replace_operand(stmt.on, &movs)
+		case Je:
+			stmt.left = mov_inline_replace_operand(stmt.left, &movs)
+			stmt.right = mov_inline_replace_operand(stmt.right, &movs)
+		case Jne:
+			stmt.left = mov_inline_replace_operand(stmt.left, &movs)
+			stmt.right = mov_inline_replace_operand(stmt.right, &movs)
+		case Jg:
+			stmt.left = mov_inline_replace_operand(stmt.left, &movs)
+			stmt.right = mov_inline_replace_operand(stmt.right, &movs)
+		case Jge:
+			stmt.left = mov_inline_replace_operand(stmt.left, &movs)
+			stmt.right = mov_inline_replace_operand(stmt.right, &movs)
+		case Jl:
+			stmt.left = mov_inline_replace_operand(stmt.left, &movs)
+			stmt.right = mov_inline_replace_operand(stmt.right, &movs)
+		case Jle:
+			stmt.left = mov_inline_replace_operand(stmt.left, &movs)
+			stmt.right = mov_inline_replace_operand(stmt.right, &movs)
 		}
 	}
 }
